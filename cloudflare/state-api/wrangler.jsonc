@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tech-intel-state-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-03",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tech-intel-db",
+      "database_id": "aa1cf7a3-98f2-49a7-98e3-182e59964120",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

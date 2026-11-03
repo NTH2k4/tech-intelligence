@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.api_token
+.env
+.env.*
+!.env.example
