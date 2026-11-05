@@ -59,6 +59,28 @@ class BriefingURLIntegrityTests(unittest.TestCase):
         self.assertNotIn("🔗 NGUỒN", result)
         self.assertNotRegex(result, r"https?://")
 
+    def test_prompt_does_not_ask_gemini_to_print_urls(self):
+        gemini = FakeGemini("Tóm tắt ngắn.")
+        BriefingComposer(gemini).compose([article("https://source.example/story")])
+        self.assertIn("KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL", gemini.prompt)
+        self.assertIn("Hệ thống sẽ tự động đính kèm", gemini.prompt)
+
+    def test_url_placeholders_and_empty_metadata_are_cleaned(self):
+        output = (
+            "Tin đáng chú ý\\n"
+            "- Nguồn & URL: Nguồn: OpenAI. URL chi tiết: Không có trong dữ liệu đầu vào.\\n"
+            "- Mã nguồn/Dữ liệu: \\n"
+            "- URL nguồn: Không có trong dữ liệu đầu vào"
+        )
+        result = BriefingComposer(FakeGemini(output)).compose(
+            [article("https://openai.com/index/example", source="OpenAI")]
+        )
+        self.assertIn("- Nguồn: OpenAI", result)
+        self.assertNotIn("URL chi tiết", result)
+        self.assertNotIn("Không có trong dữ liệu đầu vào", result)
+        self.assertNotIn("Mã nguồn/Dữ liệu:", result)
+        self.assertIn("https://openai.com/index/example", result)
+
 
 class DeliveryConfirmationTests(unittest.TestCase):
     def test_noninteractive_send_requires_explicit_yes(self):
