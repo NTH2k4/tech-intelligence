@@ -165,3 +165,22 @@ See [HANDOFF.md](HANDOFF.md) for the complete handoff and next-agent checklist. 
 ## Security
 
 Never commit `.env`, Worker `.dev.vars`, API keys, Telegram tokens, Cloudflare tokens, or local state. `.env.example` must contain placeholders only. Review staged changes before every commit.
+
+## Scheduled production operation
+
+`.github/workflows/daily-tech-intelligence.yml` runs the full scheduled entrypoint on GitHub-hosted Ubuntu at 07:00 `Asia/Ho_Chi_Minh`. Scheduled execution runs `bash scripts/run_scheduled_pipeline.sh --send`; manual `workflow_dispatch` defaults to preview and requires explicitly checking `send_briefing` to deliver.
+
+Configure these repository Actions secrets without placing values in workflow files:
+
+- `GEMINI_API_KEY`
+- `STATE_API_TOKEN` (must match the deployed Worker's `API_BEARER_TOKEN`)
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+Configure these repository Actions variables:
+
+- `STATE_API_URL=https://tech-intel-state-api.satkhidoc.workers.dev`
+- `GEMINI_MODEL=gemini-3.6-flash`
+- `GEMINI_SCORING_MODEL=gemini-3.5-flash-lite`
+
+The workflow validates required settings by name only before checking out source or installing dependencies. It has read-only `GITHUB_TOKEN` permissions, a 45-minute timeout, and non-cancelling concurrency. At most 31 scheduled runs use 1,395 Linux runner minutes/month at the timeout ceiling; the repository owner must verify the private repository's included allowance and billing cap before relying on $0 operation. Failed runs appear in the Actions run history and should be investigated before retrying delivery.

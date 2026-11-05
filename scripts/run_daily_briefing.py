@@ -236,7 +236,25 @@ def _mark_failed_safely(
         )
 
 
-def run(*, limit: int, send: bool, base_url: str | None = None) -> int:
+def _delivery_confirmation(*, send: bool, yes: bool) -> str | None:
+    if yes and not send:
+        return "yes_requires_send"
+    if send and not yes and not sys.stdin.isatty():
+        return "noninteractive_confirmation_required"
+    return None
+
+
+def run(
+    *, limit: int, send: bool, yes: bool = False, base_url: str | None = None
+) -> int:
+    confirmation_error = _delivery_confirmation(send=send, yes=yes)
+    if confirmation_error:
+        if confirmation_error == "noninteractive_confirmation_required":
+            raise RuntimeError(
+                "Non-interactive delivery requires both --send and --yes"
+            )
+        raise RuntimeError("--yes is valid only when used together with --send")
+
     briefing_date = local_briefing_date()
 
     with StateAPIClient(base_url=base_url) as state_client:
@@ -287,10 +305,9 @@ def run(*, limit: int, send: bool, base_url: str | None = None) -> int:
             print("Use --send to explicitly start the delivery workflow.")
             return 0
 
-        # For an interactive/manual run, show the exact freshly generated content
-        # and require an explicit confirmation before claiming the date or sending.
-        # Non-interactive scheduled runs still work with an explicit --send flag.
-        if sys.stdin.isatty():
+        # Manual runs require an interactive confirmation. Unattended runs must
+        # opt in explicitly with both --send and --yes.
+        if sys.stdin.isatty() and not yes:
             print("\nThis command will send the briefing to the configured Telegram chat.")
             print("Review the content above. Type SEND to confirm delivery.")
             try:
@@ -433,6 +450,11 @@ def parse_args() -> argparse.Namespace:
         help="Claim today's briefing and send it to Telegram.",
     )
     parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Explicitly authorize non-interactive delivery; requires --send.",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=MAX_ARTICLES,
@@ -450,13 +472,20 @@ def parse_args() -> argparse.Namespace:
 
     if not 1 <= args.limit <= MAX_ARTICLES:
         parser.error(f"--limit must be between 1 and {MAX_ARTICLES}")
+    if args.yes and not args.send:
+        parser.error("--yes requires --send")
     return args
 
 
 def main() -> int:
     args = parse_args()
     try:
-        return run(limit=args.limit, send=args.send, base_url=args.base_url)
+        return run(
+            limit=args.limit,
+            send=args.send,
+            yes=args.yes,
+            base_url=args.base_url,
+        )
     except KeyboardInterrupt:
         print("Interrupted by user.", file=sys.stderr)
         return 130

@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from integrations.gemini_client import GeminiClient
@@ -111,7 +112,13 @@ Hãy tạo bản tin ngay bây giờ.
         articles: list[dict[str, Any]],
         demo: bool = False
     ) -> str:
-        prompt = self.build_prompt(articles, demo)
+        # URLs are deliberately withheld from Gemini. Source links are rendered
+        # below from the immutable selected article records.
+        prompt_articles = [
+            {key: value for key, value in article.items() if key != "url"}
+            for article in articles
+        ]
+        prompt = self.build_prompt(prompt_articles, demo)
 
         result = self.gemini.generate(prompt)
 
@@ -126,7 +133,16 @@ Hãy tạo bản tin ngay bây giờ.
             if not result.startswith(prefix):
                 result = f"{prefix}\n\n{result}"
 
-        return result
+        # Strip any URL Gemini may have invented or reconstructed. The only
+        # URLs sent downstream are appended directly from article records.
+        result = re.sub(r"https?://\S+", "", result)
+        result = re.sub(r"www\.\S+", "", result).rstrip()
+        links = "\n".join(
+            f"- {article.get('source') or article.get('title')}: {article['url']}"
+            for article in articles
+            if isinstance(article.get("url"), str) and article["url"].strip()
+        )
+        return f"{result}\n\n🔗 NGUỒN\n{links}" if links else result
 
     @classmethod
     def split_message(

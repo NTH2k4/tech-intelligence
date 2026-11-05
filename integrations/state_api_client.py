@@ -7,6 +7,7 @@ from dotenv import dotenv_values, load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+APPLICATION_USER_AGENT = "tech-intelligence-state-client/1.0"
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -60,6 +61,7 @@ class StateAPIClient:
                 "Authorization": f"Bearer {self.token}",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
+                "User-Agent": APPLICATION_USER_AGENT,
             },
         )
 

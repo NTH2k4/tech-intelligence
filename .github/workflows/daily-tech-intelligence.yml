@@ -1,0 +1,81 @@
+name: Daily Tech Intelligence
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+      timezone: Asia/Ho_Chi_Minh
+  workflow_dispatch:
+    inputs:
+      send_briefing:
+        description: 'Send the Telegram briefing (leave false for preview only)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-tech-intelligence-production
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      GEMINI_SCORING_MODEL: ${{ vars.GEMINI_SCORING_MODEL }}
+      STATE_API_URL: ${{ vars.STATE_API_URL }}
+      STATE_API_TOKEN: ${{ secrets.STATE_API_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Validate required configuration without displaying values
+        env:
+          SHOULD_SEND: ${{ github.event_name == 'schedule' || inputs.send_briefing }}
+        run: |
+          required=(GEMINI_API_KEY GEMINI_MODEL GEMINI_SCORING_MODEL STATE_API_URL STATE_API_TOKEN)
+          if [[ "$SHOULD_SEND" == "true" ]]; then
+            required+=(TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID)
+          fi
+          missing=0
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required GitHub secret or variable: $name" >&2
+              missing=1
+            fi
+          done
+          if [[ "${STATE_API_URL:-}" != https://* ]]; then
+            echo "STATE_API_URL must use HTTPS" >&2
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Check out default branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run collection, scoring, persistence, and briefing
+        env:
+          SHOULD_SEND: ${{ github.event_name == 'schedule' || inputs.send_briefing }}
+        run: |
+          if [[ "$SHOULD_SEND" == "true" ]]; then
+            bash scripts/run_scheduled_pipeline.sh --send
+          else
+            bash scripts/run_scheduled_pipeline.sh --preview
+          fi
+
+      - name: Summarize failed execution
+        if: failure()
+        run: |
+          echo '## Daily Tech Intelligence failed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Inspect the failed step and logs. Environment values and authorization headers are intentionally not printed.' >> "$GITHUB_STEP_SUMMARY"
