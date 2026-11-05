@@ -6,9 +6,9 @@
 
 ## 1. Executive summary
 
-The production Worker/D1, authenticated State API, prior five-article production scoring/persistence run, and production briefing preview remain verified from the preceding remediation. No migrations or Worker deployment were repeated. This mission adds a GitHub Actions workflow and an explicit preview/send mode to the existing scheduled entrypoint. The workflow uses timezone-aware `Asia/Ho_Chi_Minh` cron, standard Ubuntu hosted runners, a concurrency group that does not cancel active delivery, a manual preview default, a 45-minute timeout, minimum repository token permissions, and a preflight that reports missing setting names without printing values.
+The production Worker/D1, authenticated State API, prior five-article production scoring/persistence run, and production briefing preview remain verified from the preceding remediation. No migrations or Worker deployment were repeated. This mission adds a GitHub Actions workflow and an explicit preview/send mode to the existing scheduled entrypoint. The workflow uses timezone-aware `Asia/Ho_Chi_Minh` cron, standard Ubuntu hosted runners, a concurrency group that does not cancel active delivery, a manual preview default, a 45-minute timeout, minimum repository token permissions, and a preflight that reports missing setting names without printing values. It was committed and pushed to `main`.
 
-The workflow and tests are validated locally, but GitHub's private repository settings, Actions allowance, repository secret names, and secret administration are not accessible through the available authenticated tools. Therefore the workflow cannot yet be confirmed enabled, configured with secrets, or actively delivering. It was not triggered; no Telegram message was sent. A normal commit/push is attempted separately after this report is finalized.
+The workflow and tests are validated locally and the workflow is on remote `main`. GitHub's private repository settings, Actions allowance, repository secret names, and secret administration are not accessible through the available authenticated tools. Therefore the workflow cannot yet be confirmed enabled, configured with secrets, or actively delivering. One clearly labeled production Telegram smoke test succeeded (message ID 8); no daily briefing or D1 lifecycle mutation was performed.
 
 ## 2. Architecture and implementation
 
@@ -80,13 +80,23 @@ At the workflow timeout ceiling, 31 scheduled executions use `31 × 45 = 1,395` 
 
 **Monthly cost assessment:** estimated $0 if an eligible included allowance covers all 1,395 worst-case scheduled minutes plus other usage, with no overage. Actual allowance and billing hard-stop configuration are **NOT VERIFIED**. No paid infrastructure was created or intentionally enabled. GitHub notes additional private-repository runner usage is billable beyond included allowance, so the owner must verify billing budget/stop settings before enabling the workflow.[GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 
-## 7. Production secrets and security
+## 7. Production Telegram smoke verification
+
+One clearly labeled message was sent through the configured `TelegramClient` to verify the production bot/chat credentials and Telegram API delivery path:
+
+```text
+telegram_smoke=PASS message_id=8
+```
+
+The message identified itself in Vietnamese as a production connectivity test and said it was not the daily briefing. It did not create a briefing claim or update D1. This verifies direct production Telegram connectivity, not delivery through the scheduled State API lifecycle. No second message was sent.
+
+## 8. Production secrets and security
 
 The workflow maps the named secrets and variables to process environment but never echoes their values. Preflight outputs only missing names. `STATE_API_TOKEN` is explicit; scheduled execution does not rely on `.dev.vars`. The entrypoint requires HTTPS State API and checks Telegram configuration only for delivery. No secret administration was possible due missing GitHub authenticated access; repository secret presence is **NOT VERIFIED**.
 
 Tests and workflow validation used fake credentials only. No secrets were printed, committed, uploaded as artifacts, or copied into YAML. The Git secret audit is limited to the staged changes scanned by Gitleaks (result recorded after staging). Existing ignored `.env` and `.dev.vars` remain local and unstaged.
 
-## 8. Pipeline, Telegram, lifecycle, and duplicate behavior
+## 9. Pipeline, Telegram, lifecycle, and duplicate behavior
 
 The scheduled command invokes `scripts/run_scheduled_pipeline.sh --send`, which sequentially runs `scripts.run_pipeline` (collect, normalize, deduplicate, source-balance, score, persist, read-back) and `scripts.run_daily_briefing --send --yes` (eligible selection, generation, deterministic source URLs, chunking, claim-before-send, delivery, completion/failure).
 
@@ -94,7 +104,7 @@ Existing code retains date uniqueness, claim-before-send, delivery completion on
 
 No Telegram production send was performed; delivery through the deployed scheduled workflow is **NOT VERIFIED**. Prior local Telegram delivery is previous evidence only, not production scheduled delivery evidence.
 
-## 9. Tests and validation
+## 10. Tests and validation
 
 Fresh local validation:
 
@@ -108,15 +118,22 @@ git diff --check                                    passed
 
 Workflow validation used actionlint 1.7.12. The repository's Python workflow test verifies manual/preview orchestration and explicit send flags without API calls. No production pipeline, Gemini, Worker, D1, or Telegram operation was repeated.
 
-## 10. Database lifecycle and duplicate protection
+## 11. Database lifecycle and duplicate protection
 
 Production schema history and unique `briefing_date` on `briefing_runs` were verified in prior reports. Local claim/complete/fail and duplicate-date tests passed 7/7 previously. No real production history was changed in this task. Production mutation behavior remains **NOT VERIFIED** separately from schema and local evidence.
 
-## 11. Git status, commit, and push
+## 12. Git commit and push
 
-The intended file list was staged explicitly; `.github/copilot-instructions.md`, prior reports, `.env`, `.dev.vars`, `.venv`, `node_modules`, and Wrangler state were excluded. `gitleaks protect --staged --redact --no-banner` scanned about 31.9 KB and reported no leaks. Commit and push IDs/results are recorded after those operations below. If remote push fails, the sanitized cause and local commit are recorded.
+The intended file list was staged explicitly; `.github/copilot-instructions.md`, prior reports, `.env`, `.dev.vars`, `.venv`, `node_modules`, and Wrangler state were excluded. `gitleaks protect --staged --redact --no-banner` scanned about 31.9 KB and reported no leaks.
 
-## 12. Operational instructions
+```text
+Commit: 9cf9ac0 feat: schedule daily production intelligence pipeline
+Push: bd642e9..9cf9ac0 main -> main (fast-forward)
+```
+
+This report's final evidence update is committed separately after the smoke-test result. No force push was used.
+
+## 13. Operational instructions
 
 Before activation, configure the listed Actions secrets/variables in repository Settings → Secrets and variables → Actions, verify the account's included private-repository minutes and hard-stop/budget settings, and verify Actions is enabled. Do not add secret values to repository files.
 
@@ -132,7 +149,7 @@ source .venv/bin/activate
 python -m scripts.run_daily_briefing --base-url https://tech-intel-state-api.satkhidoc.workers.dev
 ```
 
-## 13. Acceptance table
+## 14. Acceptance table
 
 | Area | Status | Evidence |
 |---|---|---|
@@ -146,18 +163,18 @@ python -m scripts.run_daily_briefing --base-url https://tech-intel-state-api.sat
 | Worker/D1 health | PASS (PREVIOUS EVIDENCE) | `/health` HTTP 200 and database connected. |
 | Vietnamese briefing | PASS (PREVIOUS EVIDENCE) | Production preview generated 4 articles in 2 chunks. |
 | URL integrity | PASS (PREVIOUS EVIDENCE) | Focused tests and deterministic record-based source links. |
-| Telegram delivery | NOT VERIFIED | No production Telegram send in scheduled execution. |
+| Telegram delivery | PASS (DIRECT SMOKE) | One clearly labeled production Telegram smoke accepted as message 8; scheduled lifecycle delivery not verified. |
 | Non-interactive send safety | PASS | 13 local tests; explicit `--send --yes` and preview-only mode. |
 | Claim/complete/fail lifecycle | PASS (PREVIOUS EVIDENCE) | Local lifecycle tests 7/7; no production lifecycle mutation. |
 | Duplicate prevention | PASS (PREVIOUS EVIDENCE) | Unique production date schema and prior local duplicate rejection. |
 | Workflow syntax/definition | PASS | actionlint 1.7.12; schedule, dispatch, concurrency, timeout, permissions checked. |
-| Scheduler active | BLOCKED | Remote Actions status not accessible; changes await push and settings verification. |
+| Scheduler active | BLOCKED | Workflow pushed to main; remote Actions enablement/execution status inaccessible. |
 | Required repository secrets | BLOCKED | No authenticated GitHub secret administration in this session. |
 | Failure visibility | PASS (workflow definition) | Nonzero failures and generic Actions summary; not observed on an actual run. |
 | Private Actions allowance | BLOCKED | Plan, used minutes, and hard-stop settings unavailable. |
 | Cost $0 | NOT VERIFIED | Worst-case scheduled usage 1,395 minutes/month; actual allowance unknown. |
 | Secret hygiene | PASS | No secrets output; staged-file Gitleaks scan found no leaks. |
 
-## 14. Final recommendation
+## 15. Final recommendation
 
-**PARTIALLY READY.** The production application path is supported by previous direct production evidence, and the new workflow/entrypoint are locally tested. Do not claim daily operations are active until the reviewed commit is on `main`, Actions is enabled, required repository secrets/variables are configured, the private Actions allowance/budget is confirmed, and at least one scheduled execution is observed. Telegram delivery through that scheduler remains unverified.
+**PARTIALLY READY.** The production application path is supported by previous direct production evidence, and the new workflow/entrypoint are locally tested and pushed. Daily operation is not verified until Actions is enabled, required repository secrets/variables are configured, private Actions allowance/budget is confirmed, and a scheduled execution is observed. Telegram direct connectivity passed one smoke test; scheduled lifecycle delivery remains unverified.
