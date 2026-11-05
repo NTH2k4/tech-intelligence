@@ -137,15 +137,15 @@ Hãy tạo bản tin ngay bây giờ.
 
         # Strip any URL Gemini may have invented or reconstructed. The only
         # URLs sent downstream are appended directly from article records.
-        result = re.sub(r"https?://\\S+", "", result)
-        result = re.sub(r"www\\.\\S+", "", result)
+        result = re.sub(r"https?://\S+", "", result)
+        result = re.sub(r"www\.\S+", "", result)
 
         # Gemini may emit placeholders because URLs are deliberately withheld.
         # Preserve the source name while removing misleading/empty URL fields.
         cleaned_lines = []
         for line in result.splitlines():
             source_line = re.match(
-                r"^(\\s*[-•]\\s*)?Nguồn\\s*&\\s*URL\\s*:\\s*Nguồn\\s*:\\s*(.*?)(?:[.;]\\s*URL(?:\\s+chi\\s+tiết)?\\s*:.*)?$",
+                r"^(\s*[-•]\s*)?Nguồn\s*&\s*URL\s*:\s*Nguồn\s*:\s*(.*?)(?:[.;]\s*URL(?:\s+chi\s+tiết)?\s*:.*)?$",
                 line,
                 flags=re.IGNORECASE,
             )
@@ -157,21 +157,21 @@ Hãy tạo bản tin ngay bây giờ.
                 continue
 
             if re.match(
-                r"^\\s*[-•]\\s*(?:Mã\\s*nguồn(?:/Dữ\\s*liệu)?|Dữ\\s*liệu)\\s*:\\s*$",
+                r"^\s*[-•]\s*(?:Mã\s*nguồn(?:/Dữ\s*liệu)?|Dữ\s*liệu)\s*:\s*$",
                 line,
                 flags=re.IGNORECASE,
             ):
                 continue
 
             line = re.sub(
-                r"\\s*URL(?:\\s+chi\\s+tiết|\\s+nguồn)?\\s*:\\s*(?:Không\\s+có\\s+trong\\s+dữ\\s+liệu\\s+đầu\\s+vào)?\\.?\\s*$",
+                r"\s*URL(?:\s+chi\s+tiết|\s+nguồn)?\s*:\s*(?:Không\s+có\s+trong\s+dữ\s+liệu\s+đầu\s+vào)?\.?\s*$",
                 "",
                 line,
                 flags=re.IGNORECASE,
             )
             cleaned_lines.append(line)
 
-        result = "\\n".join(cleaned_lines).strip()
+        result = "\n".join(cleaned_lines).strip()
         links = "\n".join(
             f"- {article.get('source') or article.get('title')}: {article['url']}"
             for article in articles
