@@ -129,6 +129,7 @@ The intended file list was staged explicitly; `.github/copilot-instructions.md`,
 ```text
 Commit: 9cf9ac0 feat: schedule daily production intelligence pipeline
 Push: bd642e9..9cf9ac0 main -> main (fast-forward)
+Report evidence update: b9283dd docs: record production completion evidence (pushed fast-forward)
 ```
 
 This report's final evidence update is committed separately after the smoke-test result. No force push was used.
