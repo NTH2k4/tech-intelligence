@@ -63,13 +63,13 @@ class BriefingURLIntegrityTests(unittest.TestCase):
         gemini = FakeGemini("Tóm tắt ngắn.")
         BriefingComposer(gemini).compose([article("https://source.example/story")])
         self.assertIn("KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL", gemini.prompt)
-        self.assertIn("Hệ thống sẽ tự động đính kèm", gemini.prompt)
+        self.assertIn("URL sẽ được hệ thống tự động đính kèm", gemini.prompt)
 
     def test_url_placeholders_and_empty_metadata_are_cleaned(self):
         output = (
-            "Tin đáng chú ý\\n"
-            "- Nguồn & URL: Nguồn: OpenAI. URL chi tiết: Không có trong dữ liệu đầu vào.\\n"
-            "- Mã nguồn/Dữ liệu: \\n"
+            "Tin đáng chú ý\n"
+            "- Nguồn & URL: Nguồn: OpenAI. URL chi tiết: Không có trong dữ liệu đầu vào.\n"
+            "- Mã nguồn/Dữ liệu: \n"
             "- URL nguồn: Không có trong dữ liệu đầu vào"
         )
         result = BriefingComposer(FakeGemini(output)).compose(
