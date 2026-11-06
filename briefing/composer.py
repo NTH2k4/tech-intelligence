@@ -59,7 +59,7 @@ NGUYÊN TẮC BẮT BUỘC:
 2. Không bịa đặt sự kiện, số liệu, ngày tháng hoặc phát biểu.
 3. Không tự suy diễn tiêu đề thành nội dung đã được xác nhận.
 4. Phân biệt thông tin chính thức với nhận định cộng đồng.
-5. Luôn giữ nguyên URL nguồn.
+5. KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL trong nội dung bản tin. URL sẽ được hệ thống tự động đính kèm chính xác ở mục NGUỒN.
 6. Nếu thiếu thông tin, phải nói rõ giới hạn.
 7. Không tạo tin tức mới ngoài danh sách đầu vào.
 8. Ưu tiên các nội dung có tác động thực tế đến ngành công nghệ.
@@ -78,7 +78,7 @@ Với mỗi tin:
 - Tóm tắt.
 - Điểm mới đáng chú ý.
 - Tác động hoặc ứng dụng thực tế nếu dữ liệu hỗ trợ.
-- Nguồn và URL.
+- Tên nguồn (chỉ ghi tên nguồn, KHÔNG ghi URL; hệ thống sẽ tự đính kèm liên kết ở cuối bản tin).
 
 💻 DEVELOPER RADAR
 Những thông tin hữu ích cho developer, backend và AI-driven development.
@@ -96,6 +96,8 @@ YÊU CẦU TRÌNH BÀY:
 - Không viết lời chào dài dòng.
 - Ưu tiên thông tin cô đọng.
 - Nội dung phù hợp để đọc trên Telegram.
+- Không viết các nhãn như "URL chi tiết", "URL nguồn", "Mã nguồn/Dữ liệu" nếu dữ liệu không cung cấp giá trị tương ứng.
+- Không viết câu kiểu "Không có trong dữ liệu đầu vào" để giải thích việc thiếu URL; hệ thống tự đính kèm URL ở mục NGUỒN.
 - Độ dài tối đa khoảng 3500 ký tự.
 
 {demo_notice}
@@ -136,7 +138,40 @@ Hãy tạo bản tin ngay bây giờ.
         # Strip any URL Gemini may have invented or reconstructed. The only
         # URLs sent downstream are appended directly from article records.
         result = re.sub(r"https?://\S+", "", result)
-        result = re.sub(r"www\.\S+", "", result).rstrip()
+        result = re.sub(r"www\.\S+", "", result)
+
+        # Gemini may emit placeholders because URLs are deliberately withheld.
+        # Preserve the source name while removing misleading/empty URL fields.
+        cleaned_lines = []
+        for line in result.splitlines():
+            source_line = re.match(
+                r"^(\s*[-•]\s*)?Nguồn\s*&\s*URL\s*:\s*Nguồn\s*:\s*(.*?)(?:[.;]\s*URL(?:\s+chi\s+tiết)?\s*:.*)?$",
+                line,
+                flags=re.IGNORECASE,
+            )
+            if source_line:
+                source_name = source_line.group(2).strip().rstrip(".;")
+                if source_name:
+                    prefix = source_line.group(1) or "- "
+                    cleaned_lines.append(f"{prefix}Nguồn: {source_name}")
+                continue
+
+            if re.match(
+                r"^\s*[-•]\s*(?:Mã\s*nguồn(?:/Dữ\s*liệu)?|Dữ\s*liệu)\s*:\s*$",
+                line,
+                flags=re.IGNORECASE,
+            ):
+                continue
+
+            line = re.sub(
+                r"\s*URL(?:\s+chi\s+tiết|\s+nguồn)?\s*:\s*(?:Không\s+có\s+trong\s+dữ\s+liệu\s+đầu\s+vào)?\.?\s*$",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            )
+            cleaned_lines.append(line)
+
+        result = "\n".join(cleaned_lines).strip()
         links = "\n".join(
             f"- {article.get('source') or article.get('title')}: {article['url']}"
             for article in articles
