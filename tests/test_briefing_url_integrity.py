@@ -65,6 +65,15 @@ class BriefingURLIntegrityTests(unittest.TestCase):
         self.assertIn("KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL", gemini.prompt)
         self.assertIn("URL sẽ được hệ thống tự động đính kèm", gemini.prompt)
 
+
+    def test_prompt_requires_precise_claim_status_and_no_unsupported_upgrades(self):
+        gemini = FakeGemini("Tóm tắt ngắn.")
+        BriefingComposer(gemini).compose([article("https://source.example/story")])
+        self.assertIn("đề xuất bản vá", gemini.prompt)
+        self.assertIn("đã phát hành", gemini.prompt)
+        self.assertIn("không suy diễn chi tiết kỹ thuật", gemini.prompt)
+        self.assertIn("Giữ nguyên điều kiện, phạm vi và giới hạn", gemini.prompt)
+
     def test_url_placeholders_and_empty_metadata_are_cleaned(self):
         output = (
             "Tin đáng chú ý\n"
