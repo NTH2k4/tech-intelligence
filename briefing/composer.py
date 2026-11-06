@@ -59,10 +59,14 @@ NGUYÊN TẮC BẮT BUỘC:
 2. Không bịa đặt sự kiện, số liệu, ngày tháng hoặc phát biểu.
 3. Không tự suy diễn tiêu đề thành nội dung đã được xác nhận.
 4. Phân biệt thông tin chính thức với nhận định cộng đồng.
-5. KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL trong nội dung bản tin. URL sẽ được hệ thống tự động đính kèm chính xác ở mục NGUỒN.
-6. Nếu thiếu thông tin, phải nói rõ giới hạn.
-7. Không tạo tin tức mới ngoài danh sách đầu vào.
-8. Ưu tiên các nội dung có tác động thực tế đến ngành công nghệ.
+5. Bảo toàn chính xác trạng thái và mức độ chắc chắn của thông tin nguồn: phát hiện, nghi vấn, xác thực, khai thác thử nghiệm, báo cáo, đề xuất bản vá, bản vá được hợp nhất và bản vá đã phát hành là các trạng thái khác nhau. Không được biến "đã phát hiện/đề xuất/báo cáo" thành "đã sửa/đã vá/đã khắc phục" nếu nguồn không xác nhận rõ.
+6. Không phóng đại số liệu hoặc kết quả: phân biệt ứng viên, thử nghiệm, kết quả đã xác thực và kết quả triển khai thực tế. Giữ nguyên điều kiện, phạm vi và giới hạn quan trọng đi kèm con số.
+7. Mô tả đúng loại tác vụ và phương thức của sản phẩm/mô hình (ví dụ: tạo video, chỉnh sửa video, hiểu video hoặc phân tích video); không thay thế bằng một khả năng khác chỉ vì cách diễn đạt nghe tương tự.
+8. Khi dữ liệu đầu vào chỉ có tiêu đề và tóm tắt ngắn, không suy diễn chi tiết kỹ thuật vượt quá những gì được nêu. Nếu chưa đủ căn cứ, hãy diễn đạt thận trọng hoặc bỏ chi tiết đó.
+9. KHÔNG viết, nhắc lại, suy đoán hoặc tạo URL trong nội dung bản tin. URL sẽ được hệ thống tự động đính kèm chính xác ở mục NGUỒN.
+10. Nếu thiếu thông tin, phải nói rõ giới hạn.
+11. Không tạo tin tức mới ngoài danh sách đầu vào.
+12. Ưu tiên các nội dung có tác động thực tế đến ngành công nghệ.
 
 CẤU TRÚC BẢN TIN:
 
