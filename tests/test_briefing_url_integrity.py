@@ -74,6 +74,24 @@ class BriefingURLIntegrityTests(unittest.TestCase):
         self.assertIn("không suy diễn chi tiết kỹ thuật", gemini.prompt)
         self.assertIn("Giữ nguyên điều kiện, phạm vi và giới hạn", gemini.prompt)
 
+
+    def test_prompt_distinguishes_video_generation_from_video_understanding(self):
+        gemini = FakeGemini("Tóm tắt ngắn.")
+        BriefingComposer(gemini).compose([article("https://source.example/video")])
+        self.assertIn("tạo/sinh video", gemini.prompt)
+        self.assertIn("chỉnh sửa video", gemini.prompt)
+        self.assertIn("hiểu/phân tích nội dung video đầu vào", gemini.prompt)
+        self.assertIn("thời lượng video ĐƯỢC TẠO (đầu ra)", gemini.prompt)
+        self.assertIn("KHÔNG chứng minh mô hình có khả năng hiểu", gemini.prompt)
+
+    def test_prompt_distinguishes_candidate_patches_from_upstream_fixes(self):
+        gemini = FakeGemini("Tóm tắt ngắn.")
+        BriefingComposer(gemini).compose([article("https://source.example/security")])
+        self.assertIn("bản vá ứng viên được tạo", gemini.prompt)
+        self.assertIn("không có nghĩa là lỗ hổng đã được sửa", gemini.prompt)
+        self.assertIn("bản vá đã được upstream", gemini.prompt)
+        self.assertIn("phát hiện ứng viên, lỗ hổng đã tái hiện, PoC/exploit", gemini.prompt)
+
     def test_url_placeholders_and_empty_metadata_are_cleaned(self):
         output = (
             "Tin đáng chú ý\n"
