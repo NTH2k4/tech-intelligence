@@ -110,48 +110,72 @@ def _article_priority(article: dict[str, Any]) -> float:
     return float(score) if _is_number(score) else 0.0
 
 
-def select_eligible_articles(
-    state: dict[str, Any], limit: int = MAX_ARTICLES
-) -> list[dict[str, Any]]:
-    """Select scored, recommended, not-yet-delivered articles from State API."""
-    raw_articles = state.get("articles", [])
-    if not isinstance(raw_articles, list):
-        raise RuntimeError("State API response field 'articles' must be a list")
+def _eligibility_exclusion_reason(
+    article: Any, seen_ids: set[str]
+) -> str | None:
+    """Return the first reason an article cannot enter a daily briefing."""
+    if not isinstance(article, dict):
+        return "malformed_record"
 
+    if _is_synthetic_or_test_article(article):
+        return "synthetic_or_invalid_url"
+
+    article_id = article.get("id")
+    if not isinstance(article_id, str) or not article_id.strip():
+        return "missing_id"
+    if article_id in seen_ids:
+        return "duplicate_id"
+
+    recommendation = str(article.get("recommendation") or "").strip().lower()
+    if not recommendation:
+        return "missing_recommendation"
+    if recommendation == "skip":
+        return "recommendation_skip"
+    if recommendation not in {"read", "monitor"}:
+        return "unsupported_recommendation"
+
+    status = str(article.get("status") or "").strip().lower()
+    if status == "delivered":
+        return "already_delivered_status"
+    if status not in {"discovered", "selected"}:
+        return "status_not_eligible"
+
+    if not article.get("scored_at"):
+        return "missing_scored_at"
+    if article.get("delivered_at") is not None:
+        return "already_has_delivered_at"
+    if not str(article.get("title") or "").strip():
+        return "missing_title"
+    if not str(article.get("url") or "").strip():
+        return "missing_url"
+
+    return None
+
+
+def _collect_eligible_articles(
+    raw_articles: list[Any],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Return eligible records and mutually exclusive exclusion counters."""
     eligible: list[dict[str, Any]] = []
+    exclusion_counts: dict[str, int] = {}
     seen_ids: set[str] = set()
 
     for article in raw_articles:
-        if not isinstance(article, dict):
-            continue
-        if _is_synthetic_or_test_article(article):
-            continue
-
-        article_id = article.get("id")
-        if not isinstance(article_id, str) or not article_id.strip():
-            continue
-        if article_id in seen_ids:
+        reason = _eligibility_exclusion_reason(article, seen_ids)
+        if reason:
+            exclusion_counts[reason] = exclusion_counts.get(reason, 0) + 1
             continue
 
-        recommendation = str(article.get("recommendation") or "").strip().lower()
-        status = str(article.get("status") or "").strip().lower()
-
-        if recommendation not in {"read", "monitor"}:
-            continue
-        if status not in {"discovered", "selected"}:
-            continue
-        if not article.get("scored_at"):
-            continue
-        if article.get("delivered_at") is not None:
-            continue
-        if not str(article.get("title") or "").strip():
-            continue
-        if not str(article.get("url") or "").strip():
-            continue
-
-        seen_ids.add(article_id)
+        # Only accepted records reserve an ID, matching the original selector.
+        seen_ids.add(article["id"])
         eligible.append(article)
 
+    return eligible, exclusion_counts
+
+
+def _prepare_composer_articles(
+    eligible: list[dict[str, Any]], limit: int
+) -> list[dict[str, Any]]:
     eligible.sort(
         key=lambda item: (
             _article_priority(item),
@@ -182,17 +206,26 @@ def select_eligible_articles(
         "source_authority_score",
     )
 
-    selected: list[dict[str, Any]] = []
-    for article in eligible[:limit]:
-        selected.append(
-            {
-                field: article[field]
-                for field in composer_fields
-                if field in article and article[field] is not None
-            }
-        )
+    return [
+        {
+            field: article[field]
+            for field in composer_fields
+            if field in article and article[field] is not None
+        }
+        for article in eligible[:limit]
+    ]
 
-    return selected
+
+def select_eligible_articles(
+    state: dict[str, Any], limit: int = MAX_ARTICLES
+) -> list[dict[str, Any]]:
+    """Select scored, recommended, not-yet-delivered articles from State API."""
+    raw_articles = state.get("articles", [])
+    if not isinstance(raw_articles, list):
+        raise RuntimeError("State API response field 'articles' must be a list")
+
+    eligible, _ = _collect_eligible_articles(raw_articles)
+    return _prepare_composer_articles(eligible, limit)
 
 
 def _print_preview(
@@ -258,23 +291,65 @@ def run(
     briefing_date = local_briefing_date()
 
     with StateAPIClient(base_url=base_url) as state_client:
+        # Check the date-level delivery record before composing anything. This
+        # makes repeated previews informative and prevents accidental duplicate
+        # sends if a manual run is triggered after the scheduled delivery.
+        briefing_status_result = state_client.get_briefing_status(briefing_date)
+        existing_briefing = briefing_status_result.get("briefing")
+        if isinstance(existing_briefing, dict):
+            existing_status = str(existing_briefing.get("status") or "").lower()
+            print(
+                f"Briefing already has a record for {briefing_date}: "
+                f"status={existing_status or 'unknown'}."
+            )
+            if existing_status == "sent":
+                print(
+                    "ALREADY SENT: today's briefing was delivered successfully. "
+                    "Skipping generation and Telegram delivery."
+                )
+                return 0
+            if existing_status == "sending":
+                print(
+                    "DELIVERY IN PROGRESS: do not retry. Reconcile the Telegram "
+                    "messages and State API record before taking further action.",
+                    file=sys.stderr,
+                )
+                return 2
+            if existing_status == "failed":
+                print(
+                    "PREVIOUS DELIVERY FAILED: inspect the briefing record and "
+                    "Telegram history before any recovery or retry.",
+                    file=sys.stderr,
+                )
+                return 2
+            print(
+                "UNEXPECTED BRIEFING STATE: refusing to generate or send until "
+                "the existing record is inspected.",
+                file=sys.stderr,
+            )
+            return 2
+
         print("Reading article state from State API...")
         state = state_client.get_state(limit=STATE_LIMIT)
         raw_articles = state.get("articles", [])
         if not isinstance(raw_articles, list):
             raise RuntimeError("State API response field 'articles' must be a list")
-        synthetic_count = sum(
-            1 for item in raw_articles
-            if isinstance(item, dict) and _is_synthetic_or_test_article(item)
-        )
-        articles = select_eligible_articles(state, limit=limit)
+
+        eligible_records, exclusion_counts = _collect_eligible_articles(raw_articles)
+        articles = _prepare_composer_articles(eligible_records, limit)
         print(f"Stored articles returned: {len(raw_articles)}")
-        print(f"Synthetic/test articles excluded: {synthetic_count}")
+        print(f"Eligible articles before briefing limit: {len(eligible_records)}")
+        if exclusion_counts:
+            print("Article exclusion diagnostics:")
+            for reason, count in sorted(exclusion_counts.items()):
+                print(f"  - {reason}: {count}")
+        else:
+            print("Article exclusion diagnostics: no exclusions.")
 
         if not articles:
             print(
-                "No eligible articles (read/monitor, scored, not delivered, "
-                "and not marked as synthetic/test data). Nothing to generate or send."
+                "NO BRIEFING GENERATED: no eligible scored articles remain. "
+                "No claim was created and no Telegram message was sent."
             )
             return 0
 
