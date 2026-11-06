@@ -69,7 +69,7 @@ class BriefingURLIntegrityTests(unittest.TestCase):
     def test_prompt_requires_precise_claim_status_and_no_unsupported_upgrades(self):
         gemini = FakeGemini("Tóm tắt ngắn.")
         BriefingComposer(gemini).compose([article("https://source.example/story")])
-        self.assertIn("đề xuất bản vá", gemini.prompt)
+        self.assertIn("bản vá ứng viên được tạo", gemini.prompt)
         self.assertIn("đã phát hành", gemini.prompt)
         self.assertIn("không suy diễn chi tiết kỹ thuật", gemini.prompt)
         self.assertIn("Giữ nguyên điều kiện, phạm vi và giới hạn", gemini.prompt)
