@@ -4,9 +4,48 @@ import httpx
 from datetime import datetime, timedelta, timezone
 
 from collector.normalizer import (
+    clean_text,
     make_article,
     parse_datetime,
 )
+
+
+MAX_SUMMARY_LENGTH = 3000
+
+
+def _extract_best_summary(entry: dict) -> str:
+    """Choose the richest plain-text summary/content while bounding its size."""
+    candidates: list[str] = []
+
+    raw_summary = entry.get("summary")
+    if isinstance(raw_summary, str):
+        cleaned_summary = clean_text(raw_summary)
+        if cleaned_summary:
+            candidates.append(cleaned_summary)
+
+    raw_content = entry.get("content") or []
+    if isinstance(raw_content, dict):
+        raw_content = [raw_content]
+    elif isinstance(raw_content, str):
+        raw_content = [{"value": raw_content}]
+
+    if isinstance(raw_content, list):
+        for item in raw_content:
+            if not isinstance(item, dict):
+                continue
+            value = item.get("value")
+            if not isinstance(value, str):
+                continue
+            cleaned_content = clean_text(value)
+            if cleaned_content:
+                candidates.append(cleaned_content)
+
+    if not candidates:
+        return ""
+
+    # Prefer the longest cleaned candidate; ties preserve RSS summary priority.
+    best_candidate = max(candidates, key=len)
+    return best_candidate[:MAX_SUMMARY_LENGTH]
 
 
 def fetch_rss_source(
@@ -44,11 +83,9 @@ def fetch_rss_source(
         if published and published < cutoff:
             continue
 
-        # Extract summary or content.
-        summary = entry.get("summary", "")
-
-        if not summary and entry.get("content"):
-            summary = entry["content"][0].get("value", "")
+        # Some feeds expose only a short description while others include a
+        # richer content:encoded field. Use the best cleaned source text.
+        summary = _extract_best_summary(entry)
 
         try:
             article = make_article(
