@@ -1,0 +1,17 @@
+{
+  "name": "tech-intel-scheduler",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-14",
+  "workers_dev": false,
+  "vars": {
+    "GITHUB_OWNER": "NTH2k4",
+    "GITHUB_REPOSITORY": "tech-intelligence",
+    "GITHUB_WORKFLOW_FILE": "daily-tech-intelligence.yml",
+    "GITHUB_REF": "main"
+  },
+  "triggers": {
+    "crons": [
+      "17 0 * * *"
+    ]
+  }
+}
