@@ -2,6 +2,7 @@ name: Daily Tech Intelligence
 
 on:
   schedule:
+    # Fallback schedule. Cloudflare Cron is the primary scheduler after cutover.
     # 00:17 UTC = 07:17 Asia/Ho_Chi_Minh (UTC+7)
     - cron: '17 0 * * *'
   workflow_dispatch:
@@ -11,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      trigger_source:
+        description: 'Scheduler source for audit logs'
+        required: false
+        default: 'manual'
+        type: string
 
 permissions:
   contents: read
@@ -64,7 +70,18 @@ jobs:
       - name: Install project dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt
 
+      - name: Check today's delivery state
+        id: briefing-preflight
+        run: python -m scripts.preflight_daily_briefing
+
+      - name: Record scheduler source
+        env:
+          TRIGGER_SOURCE: ${{ github.event_name == 'schedule' && 'github-schedule-fallback' || inputs.trigger_source || 'manual' }}
+        run: |
+          echo "Trigger source: ${TRIGGER_SOURCE}"
+
       - name: Run collection, scoring, persistence, and briefing
+        if: steps.briefing-preflight.outputs.skip_pipeline != 'true'
         env:
           SHOULD_SEND: ${{ github.event_name == 'schedule' || inputs.send_briefing }}
         run: |
