@@ -32,7 +32,11 @@ class PreflightDailyBriefingTests(unittest.TestCase):
                 redirect_stderr(StringIO()),
             ):
                 code = preflight.main()
-            contents = output.read_text(encoding="utf-8")
+            contents = (
+                output.read_text(encoding="utf-8")
+                if output.exists()
+                else ""
+            )
 
         return code, contents
 
