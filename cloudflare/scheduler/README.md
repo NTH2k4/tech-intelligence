@@ -27,19 +27,47 @@ truth for execution and delivery.
 
 ## Required configuration
 
+### 1. GitHub dispatch token
+
 Create a fine-grained GitHub personal access token scoped to this repository:
 
-- Repository access: only `NTH2k4/tech-intelligence`
+- Resource owner: `NTH2k4`
+- Repository access: only `tech-intelligence`
 - Repository permission: `Actions: Read and write`
 - No Contents, Secrets, Administration, or Organization permissions are needed
   for the dispatch endpoint.
 - Set an expiry and rotate the token before it expires.
 
-Add these GitHub repository settings before deploying:
+### 2. Cloudflare Worker and deployment token
+
+The Worker name is `tech-intel-scheduler`. To avoid granting broad Workers
+Admin permission to CI:
+
+1. In Cloudflare Dashboard, open **Workers & Pages** and create a small
+   placeholder Worker named exactly `tech-intel-scheduler`. Deploy the default
+   placeholder once. The Wrangler config in this repository sets
+   `workers_dev: false` and adds no public route; the production Worker is
+   invoked by its Cron Trigger.
+2. Create a Cloudflare API token for CI with the **Workers → Editor** role,
+   scoped to the single `tech-intel-scheduler` Worker. This allows Wrangler
+   to update/deploy that existing Worker and configure its secret, without
+   granting access to the rest of the account's Workers.
+3. If you choose not to pre-create the placeholder Worker, the first deployment
+   must instead use **Workers product-level Admin** permission to create the
+   Worker. Rotate that token to the single-Worker Editor scope immediately
+   after bootstrap.
+
+Cloudflare's current authorization model requires product-level Admin to create
+a new Worker, while Editor can deploy an existing Worker. See the official
+[Workers authorization guide](https://developers.cloudflare.com/workers/authorization/workers/).
+
+### 3. GitHub repository settings
+
+Add these under **Repository → Settings → Secrets and variables → Actions**:
 
 | Setting | Type | Value |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | Actions secret | Cloudflare API token with permission to edit Workers Scripts for the target account |
+| `CLOUDFLARE_API_TOKEN` | Actions secret | Cloudflare API token described above |
 | `GITHUB_WORKFLOW_DISPATCH_TOKEN` | Actions secret | Fine-grained token described above |
 | `CLOUDFLARE_ACCOUNT_ID` | Actions variable | Cloudflare account ID containing the Worker |
 
@@ -49,7 +77,7 @@ or printed in workflow logs.
 
 ## Deploy
 
-After the GitHub settings above are configured, run:
+After the GitHub settings and placeholder Worker are configured, run:
 
 **GitHub → Actions → Deploy Cloudflare Daily Scheduler → Run workflow**
 
@@ -59,9 +87,12 @@ secret. Wrangler deploys the Cron Trigger from this file.
 The equivalent local commands, from the repository root, are:
 
 ```bash
-npx --yes wrangler@4.156.2 deploy --config cloudflare/scheduler/wrangler.jsonc
+npx --yes wrangler@4.156.2 deploy \
+  --config cloudflare/scheduler/wrangler.jsonc
+
 printf '%s' "$GITHUB_WORKFLOW_DISPATCH_TOKEN" |
-  npx --yes wrangler@4.156.2 secret put GITHUB_TOKEN     --config cloudflare/scheduler/wrangler.jsonc
+  npx --yes wrangler@4.156.2 secret put GITHUB_TOKEN \
+    --config cloudflare/scheduler/wrangler.jsonc
 ```
 
 Do not run the local commands until the required Cloudflare and GitHub
@@ -73,7 +104,10 @@ From the repository root:
 
 ```bash
 node --test cloudflare/scheduler/test/*.test.js
-npx --yes wrangler@4.156.2 dev   --config cloudflare/scheduler/wrangler.jsonc   --test-scheduled
+
+npx --yes wrangler@4.156.2 dev \
+  --config cloudflare/scheduler/wrangler.jsonc \
+  --test-scheduled
 ```
 
 Then invoke the local scheduled handler in another terminal:
@@ -96,9 +130,9 @@ network requests.
   collection/scoring work. A later fallback invocation exits successfully
   without running the pipeline when today's briefing is already `sent`.
 - The existing D1 `briefing_date` uniqueness and `run_daily_briefing.py`
-  preflight remain the final duplicate-delivery safeguards.
+  claim flow remain the final duplicate-delivery safeguards.
 - Do not remove the GitHub schedule until the Cloudflare Cron invocation and
-  the resulting Telegram delivery have both been verified on production.
+  the resulting Telegram delivery have both been verified in production.
 - If Cloudflare scheduling fails, inspect **Workers & Pages → tech-intel-scheduler
   → Settings → Trigger Events** and the Worker logs. If dispatch was accepted,
   inspect the resulting GitHub Actions run before attempting any manual retry.
